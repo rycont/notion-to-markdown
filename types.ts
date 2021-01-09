@@ -41,3 +41,9 @@ export interface NotionBlock {
         }
     }
 }
+
+export interface TableRow {
+    pageId: string;
+    title: string;
+    tags: string[];
+}

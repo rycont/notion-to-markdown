@@ -170,7 +170,7 @@ var convertToMarkdown = function (content) {
     return content.map(function (row) { return row === null || row === void 0 ? void 0 : row.map(function (intend) {
         var _a, _b;
         var decorated = (intend.properties ? (Object.keys(intend.properties).map(function (key) { return ({
-            i: '__',
+            i: '_',
             b: '**'
         })[key] || ''; }, '')) : []).reduce(function (acc, current) { return (current + acc + current); }, intend.text);
         if (intend.type === types_1.BlockType.image)

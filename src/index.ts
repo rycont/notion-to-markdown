@@ -78,7 +78,7 @@ export const convertToMarkdown = (content: Unit[][]) => {
     return content.map(row =>
         row?.map(intend => {
             const decorated = (intend.properties ? (Object.keys(intend.properties).map(key => ({
-                i: '__',
+                i: '_',
                 b: '**'
             })[key as | 'i' | 'b'] || '', '')) : []).reduce((acc, current) => (
                 current + acc + current

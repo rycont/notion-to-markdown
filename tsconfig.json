@@ -2,6 +2,7 @@
     "compilerOptions": {
         "lib": ["DOM", "ES2020"],
         "strict": true,
-        "esModuleInterop": true
+        "esModuleInterop": true,
+        "declaration": true
     }
 }

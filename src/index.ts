@@ -53,8 +53,8 @@ export const getPageContent = async (pageId: string): Promise<{
         if (block.value.properties?.title)
             return block.value.properties.title.map(element => ({
                 text: element[0],
-                properties: element[1] && parseStyle(block?.value.type, element[1]),
-                type: block.value.type as BlockType
+                properties: element[1] && block?.value?.type && parseStyle(block?.value?.type, element[1]),
+                type: block.value?.type as BlockType
             }))
 
         if (block.value.properties?.source)
@@ -104,11 +104,11 @@ export const convertToMarkdown = (content: Unit[][]) => {
 
 const processArticleTable = (blocks: {
     [key: string]: NotionBlock
-}) => Object.values(blocks).slice(2).filter((block) => block.value.type === BlockType.page).map((block) => ({
-    pageId: block?.value?.id,
+}) => Object.values(blocks).slice(2).filter((block) => block.value?.type === BlockType.page).map((block) => ({
+    pageId: block.value?.id || '',
     title: block?.value?.properties?.title?.[0][0] || '',
     tags: block?.value?.properties?.["s3#F"]?.[0]?.[0]?.split(',') || [],
-}))
+})).filter(page => page.pageId)
 
 export const getTableContent = async (info: TableInfo): Promise<TableRow[]> => {
     const collectionData = await (await fetcher("https://www.notion.so/api/v3/queryCollection", {
@@ -147,11 +147,12 @@ export const getTableContent = async (info: TableInfo): Promise<TableRow[]> => {
 
 export const getTableInfo = async (pageId: string): Promise<TableInfo> => {
     const pageData = await getPage(pageId)
-
+    const tableBlock = (Object.values(pageData.recordMap.block)[0]).value
+    if(!tableBlock) throw new Error("Cannot find table")
     const {
         collection_id: collectionId,
         view_ids: [viewId]
-    } = (Object.values(pageData.recordMap.block)[0]).value
+    } = tableBlock
 
     return {
         collectionId,

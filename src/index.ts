@@ -136,12 +136,12 @@ export const getTableContent = async (info: TableInfo): Promise<TableRow[]> => {
         method: "POST"
     })).json() as {
         recordMap: {
-            block: {
+            block?: {
                 [key: string]: NotionBlock
             }
         }
     }
-
+    if(!collectionData.recordMap.block) throw new Error("Cannot access article");
     return processArticleTable(collectionData.recordMap.block)
 }
 

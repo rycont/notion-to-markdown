@@ -1,4 +1,4 @@
-import { BlockType, NotionBlock, Unit, TableInfo, TableRow } from "./types.ts"
+import { BlockType, NotionBlock, Unit, TableInfo, TableRow } from "./types"
 
 const getPage = async (pageId: string): Promise<{
     recordMap: {
@@ -95,7 +95,7 @@ export const convertToMarkdown = (content: Unit[][]) => {
                 page: '# '
             })[intend.type] + decorated
         }).join('')
-    ).join('\n')
+    ).join('\n\n')
 }
 
 export const getTableContent = async (info: TableInfo): Promise<TableRow[]> => {

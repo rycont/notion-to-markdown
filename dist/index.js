@@ -141,7 +141,7 @@ var convertToMarkdown = function (content) {
             numbered_list: '1. ',
             page: '# '
         })[intend.type] + decorated;
-    }).join(''); }).join('\n');
+    }).join(''); }).join('\n\n');
 };
 exports.convertToMarkdown = convertToMarkdown;
 var getTableContent = function (info) { return __awaiter(void 0, void 0, void 0, function () {

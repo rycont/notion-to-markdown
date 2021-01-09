@@ -3,6 +3,8 @@
         "lib": ["DOM", "ES2020"],
         "strict": true,
         "esModuleInterop": true,
-        "declaration": true
+        "declaration": true,
+        "rootDir": "./src",
+        "outDir": "./dist"
     }
 }

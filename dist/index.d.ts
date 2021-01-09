@@ -12,4 +12,10 @@ export declare const getArticleWithBriefId: (tableId: string, briefId: string) =
     title: string;
     tags: string[];
 }>;
+export declare const getTags: (tableId: string) => Promise<string[]>;
+export declare const getArticlesWithTag: (tableId: string, tag: string) => Promise<{
+    pageId: string;
+    title: string;
+    tags: string[];
+}[]>;
 export declare const getTable: (pageId: string) => Promise<TableRow[]>;

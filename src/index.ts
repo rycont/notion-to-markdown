@@ -1,4 +1,8 @@
 import { BlockType, NotionBlock, Unit, TableInfo, TableRow } from "./types"
+import nfetch, { Headers as nHeaders } from 'node-fetch'
+
+const fetcher = global.fetch || nfetch
+const PolyHeaders = global.Headers || nHeaders
 
 const getPage = async (pageId: string): Promise<{
     recordMap: {
@@ -6,7 +10,7 @@ const getPage = async (pageId: string): Promise<{
             [key: string]: NotionBlock
         }
     }
-}> => await (await fetch("https://www.notion.so/api/v3/loadPageChunk", {
+}> => await (await fetcher("https://www.notion.so/api/v3/loadPageChunk", {
     body: JSON.stringify({
         "pageId": pageId,
         "limit": 50,
@@ -20,7 +24,7 @@ const getPage = async (pageId: string): Promise<{
         "chunkNumber": 0,
         "verticalColumns": false
     }),
-    headers: new Headers({
+    headers: new PolyHeaders({
         "content-type": "application/json"
     }),
     method: "POST"
@@ -98,8 +102,16 @@ export const convertToMarkdown = (content: Unit[][]) => {
     ).join('\n\n')
 }
 
+const processArticleTable = (blocks: {
+    [key: string]: NotionBlock
+}) => Object.values(blocks).slice(2).filter((block) => block.value.type === BlockType.page).map((block) => ({
+    pageId: block?.value?.id,
+    title: block?.value?.properties?.title?.[0][0] || '',
+    tags: block?.value?.properties?.["s3#F"]?.[0]?.[0]?.split(',') || [],
+}))
+
 export const getTableContent = async (info: TableInfo): Promise<TableRow[]> => {
-    const collectionData = await (await fetch("https://www.notion.so/api/v3/queryCollection", {
+    const collectionData = await (await fetcher("https://www.notion.so/api/v3/queryCollection", {
         body: JSON.stringify({
             "collectionId": info.collectionId,
             "collectionViewId": info.viewId,
@@ -118,7 +130,7 @@ export const getTableContent = async (info: TableInfo): Promise<TableRow[]> => {
                 "loadContentCover": true
             }
         }),
-        headers: new Headers({
+        headers: new PolyHeaders({
             "content-type": "application/json"
         }),
         method: "POST"
@@ -130,11 +142,7 @@ export const getTableContent = async (info: TableInfo): Promise<TableRow[]> => {
         }
     }
 
-    return Object.values(collectionData.recordMap.block).slice(2).filter((block) => block.value.type === BlockType.page).map((block) => ({
-        pageId: block?.value?.id,
-        title: block?.value?.properties?.title?.[0][0] || '',
-        tags: block?.value?.properties?.["s3#F"]?.[0]?.[0]?.split(',') || [],
-    }))
+    return processArticleTable(collectionData.recordMap.block)
 }
 
 export const getTableInfo = async (pageId: string): Promise<TableInfo> => {
@@ -159,6 +167,60 @@ export const getArticleWithBriefId = async (tableId: string, briefId: string) =>
         content: convertToMarkdown((await getPageContent(page.pageId)).content)
     }
     throw new Error("Cannot find article")
+}
+
+export const getTags = async (tableId: string) => {
+    return [...new Set((await getTable(tableId)).map(e => e.tags).flat())]
+}
+
+export const getArticlesWithTag = async (tableId: string, tag: string) => {
+    const table = await getTableInfo(tableId)
+    const collectionData = await (await fetcher("https://www.notion.so/api/v3/queryCollection", {
+        body: JSON.stringify({
+            "collectionId": table.collectionId,
+            "collectionViewId": table.viewId,
+            "query": {
+                "aggregations": [
+                    {
+                        "aggregator": "count"
+                    }
+                ],
+                "filter": {
+                    "operator": "and",
+                    "filters": [
+                        {
+                            "property": "s3#F",
+                            "filter": {
+                                "operator": "enum_contains",
+                                "value": {
+                                    "type": "exact",
+                                    "value": tag
+                                }
+                            }
+                        }
+                    ]
+                }
+            },
+            "loader": {
+                "type": "table",
+                "limit": 50,
+                "searchQuery": "",
+                "userTimeZone": "Asia/Seoul",
+                "loadContentCover": true
+            }
+        }),
+        headers: new PolyHeaders({
+            "content-type": "application/json"
+        }),
+        method: "POST"
+    })).json() as {
+        recordMap: {
+            block: {
+                [key: string]: NotionBlock
+            }
+        }
+    }
+    return processArticleTable(collectionData.recordMap.block)
 }
 
 export const getTable = async (pageId: string): Promise<TableRow[]> => await getTableContent(await getTableInfo(pageId))

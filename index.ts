@@ -1,4 +1,4 @@
-import { BlockType, NotionBlock, Unit, TableInfo } from "./types.ts"
+import { BlockType, NotionBlock, Unit, TableInfo } from "./types"
 
 const getPage = async (pageId: string): Promise<{
     recordMap: {

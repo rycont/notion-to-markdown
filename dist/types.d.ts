@@ -21,9 +21,9 @@ export declare enum BlockType {
 }
 export interface NotionBlock {
     role: string;
-    value: {
+    value?: {
         id: string;
-        type: BlockType;
+        type?: BlockType;
         created_time: number;
         last_edited_time: number;
         parent_id: string;

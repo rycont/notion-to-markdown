@@ -140,11 +140,14 @@ var getPageContent = function (pageId) { return __awaiter(void 0, void 0, void 0
                     if (!block.value)
                         return null;
                     if ((_a = block.value.properties) === null || _a === void 0 ? void 0 : _a.title)
-                        return block.value.properties.title.map(function (element) { return ({
-                            text: element[0],
-                            properties: element[1] && parseStyle(block === null || block === void 0 ? void 0 : block.value.type, element[1]),
-                            type: block.value.type
-                        }); });
+                        return block.value.properties.title.map(function (element) {
+                            var _a, _b, _c;
+                            return ({
+                                text: element[0],
+                                properties: element[1] && ((_a = block === null || block === void 0 ? void 0 : block.value) === null || _a === void 0 ? void 0 : _a.type) && parseStyle((_b = block === null || block === void 0 ? void 0 : block.value) === null || _b === void 0 ? void 0 : _b.type, element[1]),
+                                type: (_c = block.value) === null || _c === void 0 ? void 0 : _c.type
+                            });
+                        });
                     if ((_b = block.value.properties) === null || _b === void 0 ? void 0 : _b.source)
                         return [{
                                 text: ((_d = (_c = block.value.properties) === null || _c === void 0 ? void 0 : _c.caption) === null || _d === void 0 ? void 0 : _d[0][0]) || '',
@@ -186,14 +189,14 @@ var convertToMarkdown = function (content) {
     }).join(''); }).join('\n\n');
 };
 exports.convertToMarkdown = convertToMarkdown;
-var processArticleTable = function (blocks) { return Object.values(blocks).slice(2).filter(function (block) { return block.value.type === types_1.BlockType.page; }).map(function (block) {
+var processArticleTable = function (blocks) { return Object.values(blocks).slice(2).filter(function (block) { var _a; return ((_a = block.value) === null || _a === void 0 ? void 0 : _a.type) === types_1.BlockType.page; }).map(function (block) {
     var _a, _b, _c, _d, _e, _f, _g, _h, _j;
     return ({
-        pageId: (_a = block === null || block === void 0 ? void 0 : block.value) === null || _a === void 0 ? void 0 : _a.id,
+        pageId: ((_a = block.value) === null || _a === void 0 ? void 0 : _a.id) || '',
         title: ((_d = (_c = (_b = block === null || block === void 0 ? void 0 : block.value) === null || _b === void 0 ? void 0 : _b.properties) === null || _c === void 0 ? void 0 : _c.title) === null || _d === void 0 ? void 0 : _d[0][0]) || '',
         tags: ((_j = (_h = (_g = (_f = (_e = block === null || block === void 0 ? void 0 : block.value) === null || _e === void 0 ? void 0 : _e.properties) === null || _f === void 0 ? void 0 : _f["s3#F"]) === null || _g === void 0 ? void 0 : _g[0]) === null || _h === void 0 ? void 0 : _h[0]) === null || _j === void 0 ? void 0 : _j.split(',')) || []
     });
-}); };
+}).filter(function (page) { return page.pageId; }); };
 var getTableContent = function (info) { return __awaiter(void 0, void 0, void 0, function () {
     var collectionData;
     return __generator(this, function (_a) {
@@ -225,19 +228,24 @@ var getTableContent = function (info) { return __awaiter(void 0, void 0, void 0,
             case 1: return [4 /*yield*/, (_a.sent()).json()];
             case 2:
                 collectionData = _a.sent();
+                if (!collectionData.recordMap.block)
+                    throw new Error("Cannot access article");
                 return [2 /*return*/, processArticleTable(collectionData.recordMap.block)];
         }
     });
 }); };
 exports.getTableContent = getTableContent;
 var getTableInfo = function (pageId) { return __awaiter(void 0, void 0, void 0, function () {
-    var pageData, _a, collectionId, _b, viewId;
-    return __generator(this, function (_c) {
-        switch (_c.label) {
+    var pageData, tableBlock, collectionId, _a, viewId;
+    return __generator(this, function (_b) {
+        switch (_b.label) {
             case 0: return [4 /*yield*/, getPage(pageId)];
             case 1:
-                pageData = _c.sent();
-                _a = (Object.values(pageData.recordMap.block)[0]).value, collectionId = _a.collection_id, _b = __read(_a.view_ids, 1), viewId = _b[0];
+                pageData = _b.sent();
+                tableBlock = (Object.values(pageData.recordMap.block)[0]).value;
+                if (!tableBlock)
+                    throw new Error("Cannot find table");
+                collectionId = tableBlock.collection_id, _a = __read(tableBlock.view_ids, 1), viewId = _a[0];
                 return [2 /*return*/, {
                         collectionId: collectionId,
                         viewId: viewId

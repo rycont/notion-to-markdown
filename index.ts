@@ -1,7 +1,4 @@
-interface TableInfo {
-    collectionId: string;
-    viewId: string;
-}
+import { BlockType, NotionBlock, Unit, TableInfo } from "./types.ts"
 
 const getPage = async (pageId: string): Promise<{
     recordMap: {
@@ -39,46 +36,14 @@ const parseStyle = (type: string, attributes: string[][]) => {
     ]))
 }
 
-interface Unit {
-    text: string;
-    type: BlockType;
-    properties: {
-        [key: string]: string;
-    } | undefined;
-}
-
-enum BlockType {
-    text = "text",
-    image = "image",
-    header = "header",
-    sub_header = "sub_header",
-    sub_sub_header = "sub_sub_header"
-}
-
-interface NotionBlock {
-    "role": string
-    "value": {
-        "id": string
-        "type": BlockType,
-        "created_time": number,
-        "last_edited_time": number,
-        "parent_id": string
-        "parent_table": string,
-        properties?: {
-            title?: [string, [string[]] | undefined][]
-            source?: [string[]]
-            caption?: [string[]]
-        }
-    }
-}
-
 const isAvaliable = <T>(d: any): d is T => !!d
 
-const getPageContent = async (pageId: string): Promise<{
+export const getPageContent = async (pageId: string): Promise<{
     title: string;
     content: Unit[][]
 }> => {
-    const converted = Object.values((await getPage(pageId)).recordMap.block).map(block => {
+    const fetchedPage = await getPage(pageId)
+    const converted = Object.values(fetchedPage.recordMap.block).map(block => {
         if (!block.value) return null
 
         if (block.value.properties?.title)
@@ -105,7 +70,7 @@ const getPageContent = async (pageId: string): Promise<{
     }
 }
 
-const convertToMarkdown = (content: Unit[][]) => {
+export const convertToMarkdown = (content: Unit[][]) => {
     return content.map(row =>
         row?.map(intend => {
             const decorated = (intend.properties ? (Object.keys(intend.properties).map(key => ({
@@ -117,20 +82,29 @@ const convertToMarkdown = (content: Unit[][]) => {
                 intend.text
             )
 
-            if(intend.type === BlockType.image) return `![${intend.text}](${intend?.properties?.src})`;
-            if(intend.properties?.latex) return `$LATEX$(${intend.properties.latex})`
+            if (intend.type === BlockType.image) return `![${intend.text}](${intend?.properties?.src})`;
+            if (intend.properties?.latex) return `$LATEX$(${intend.properties.latex})`
 
             return ({
                 text: '',
-                header: '#',
-                sub_header: '##',
-                sub_sub_header: '###',
+                header: '# ',
+                sub_header: '## ',
+                sub_sub_header: '### ',
+                quote: '> ',
+                numbered_list: '1. ',
+                page: '# '
             })[intend.type] + decorated
         }).join('')
     ).join('\n')
 }
 
-const getTableContent = async (info: TableInfo) => {
+interface TableRow {
+    pageId: string;
+    title: string;
+    tags: string[];
+}
+
+export const getTableContent = async (info: TableInfo): Promise<TableRow[]> => {
     const collectionData = await (await fetch("https://www.notion.so/api/v3/queryCollection", {
         body: JSON.stringify({
             "collectionId": info.collectionId,
@@ -154,22 +128,28 @@ const getTableContent = async (info: TableInfo) => {
             "content-type": "application/json"
         }),
         method: "POST"
-    })).json()
+    })).json() as {
+        recordMap: {
+            block: {
+                [key: string]: NotionBlock
+            }
+        }
+    }
 
-    return Object.values(collectionData.recordMap.block).slice(2).filter((block: any) => block.value.type === 'page').map((block: any) => ({
+    return Object.values(collectionData.recordMap.block).slice(2).filter((block) => block.value.type === BlockType.page).map((block) => ({
         pageId: block?.value?.id,
-        title: block?.value?.properties?.title[0][0],
+        title: block?.value?.properties?.title?.[0][0] || '',
         tags: block?.value?.properties?.["s3#F"]?.[0]?.[0]?.split(',') || [],
     }))
 }
 
-const getTableInfo = async (pageId: string): Promise<TableInfo> => {
+export const getTableInfo = async (pageId: string): Promise<TableInfo> => {
     const pageData = await getPage(pageId)
 
     const {
         collection_id: collectionId,
         view_ids: [viewId]
-    } = (Object.values(pageData.recordMap.block)[0] as any).value
+    } = (Object.values(pageData.recordMap.block)[0]).value
 
     return {
         collectionId,
@@ -177,5 +157,14 @@ const getTableInfo = async (pageId: string): Promise<TableInfo> => {
     }
 }
 
-// getTableInfo("e835bb3c-b921-48da-8143-3b3f1587f9ec").then(info => getTableContent(info)).then(table => getPageContent(table[0].pageId)).then(console.log)
-getPageContent("cdcfe852-5254-49da-9da6-54b068ee128d").then(content => console.log(convertToMarkdown(content.content)))
+export const getArticleWithBriefId = async (tableId: string, briefId: string) => {
+    const table = await getTable(tableId)
+    const page = table.find(page => page.pageId.startsWith(briefId))
+    if(page?.pageId) return {
+        ...page,
+        content: convertToMarkdown((await getPageContent(page.pageId)).content)
+    }
+    throw new Error("Cannot find article")
+}
+
+export const getTable = async (pageId: string): Promise<TableRow[]> => await getTableContent(await getTableInfo(pageId))

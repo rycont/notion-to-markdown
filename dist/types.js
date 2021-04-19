@@ -11,4 +11,5 @@ var BlockType;
     BlockType["quote"] = "quote";
     BlockType["numbered_list"] = "numbered_list";
     BlockType["page"] = "page";
+    BlockType["code"] = "code";
 })(BlockType = exports.BlockType || (exports.BlockType = {}));

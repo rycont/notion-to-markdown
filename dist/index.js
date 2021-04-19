@@ -166,26 +166,51 @@ var getPageContent = function (pageId) { return __awaiter(void 0, void 0, void 0
     });
 }); };
 exports.getPageContent = getPageContent;
+var applyInlineType = function (intend) {
+    var _a;
+    if (!intend.properties)
+        return intend.text;
+    if ((_a = intend.properties) === null || _a === void 0 ? void 0 : _a.latex)
+        return "$" + intend.properties.latex + "$";
+    var decorated = (intend.properties ? (Object.keys(intend.properties).map(function (key) { return ({
+        i: '_',
+        b: '**',
+        c: '`'
+    })[key] || ''; }, '')) : []).reduce(function (acc, current) { return (current + acc + current); }, intend.text);
+    return decorated;
+};
+var applyBlockType = function (intend, before) {
+    var _a, _b;
+    // latex
+    if ((_a = intend.properties) === null || _a === void 0 ? void 0 : _a.latex)
+        return "$$\n" + intend.properties.latex + "\n$$";
+    if (intend.type === types_1.BlockType.text)
+        return before;
+    // image
+    if (intend.type === types_1.BlockType.image)
+        return "![" + before + "](" + ((_b = intend === null || intend === void 0 ? void 0 : intend.properties) === null || _b === void 0 ? void 0 : _b.src) + ")";
+    // code
+    if (intend.type === types_1.BlockType.code)
+        return "```\n" + before + "\n```";
+    return (({
+        text: '',
+        header: '# ',
+        sub_header: '## ',
+        sub_sub_header: '### ',
+        quote: '> ',
+        numbered_list: '1. ',
+        page: '# ',
+        code: '```' // not used.
+    })[intend.type] || '') + before;
+};
+var renderers = [
+    applyInlineType,
+    applyBlockType
+];
 var convertToMarkdown = function (content) {
     return content.map(function (row) { return row === null || row === void 0 ? void 0 : row.map(function (intend) {
-        var _a, _b;
-        var decorated = (intend.properties ? (Object.keys(intend.properties).map(function (key) { return ({
-            i: '_',
-            b: '**'
-        })[key] || ''; }, '')) : []).reduce(function (acc, current) { return (current + acc + current); }, intend.text);
-        if (intend.type === types_1.BlockType.image)
-            return "![" + intend.text + "](" + ((_a = intend === null || intend === void 0 ? void 0 : intend.properties) === null || _a === void 0 ? void 0 : _a.src) + ")";
-        if ((_b = intend.properties) === null || _b === void 0 ? void 0 : _b.latex)
-            return "$LATEX$(" + intend.properties.latex + ")";
-        return ({
-            text: '',
-            header: '# ',
-            sub_header: '## ',
-            sub_sub_header: '### ',
-            quote: '> ',
-            numbered_list: '1. ',
-            page: '# '
-        })[intend.type] + decorated;
+        var rendered = renderers.reduce(function (before, current) { return current(intend, before); }, '');
+        return rendered;
     }).join(''); }).join('\n\n');
 };
 exports.convertToMarkdown = convertToMarkdown;

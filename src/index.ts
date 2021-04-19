@@ -1,4 +1,4 @@
-import { BlockType, NotionBlock, Unit, TableInfo, TableRow } from "./types"
+import { BlockType, NotionBlock, Unit, TableInfo, TableRow, UnitRenderer } from "./types"
 import nfetch, { Headers as nHeaders } from 'node-fetch'
 
 const fetcher = global.fetch || nfetch
@@ -74,30 +74,59 @@ export const getPageContent = async (pageId: string): Promise<{
     }
 }
 
+const applyInlineType: UnitRenderer = (intend: Unit) => {
+    if (!intend.properties) return intend.text
+
+    if (intend.properties?.latex)
+        return `$${intend.properties.latex}$`
+
+    const decorated = (intend.properties ? (Object.keys(intend.properties).map(key => ({
+        i: '_',
+        b: '**',
+        c: '`'
+    })[key as | 'i' | 'b'] || '', '')) : []).reduce((acc, current) => (
+        current + acc + current
+    ),
+        intend.text
+    )
+
+    return decorated
+}
+
+const applyBlockType = (intend: Unit, before: string) => {
+    // latex
+    if (intend.properties?.latex) return `$$\n${intend.properties.latex}\n$$`
+
+    if (intend.type === BlockType.text) return before
+
+    // image
+    if (intend.type === BlockType.image) return `![${before}](${intend?.properties?.src})`;
+
+    // code
+    if (intend.type === BlockType.code) return "```\n" + before + "\n```"
+
+    return (({
+        text: '',
+        header: '# ',
+        sub_header: '## ',
+        sub_sub_header: '### ',
+        quote: '> ',
+        numbered_list: '1. ',
+        page: '# ',
+        code: '```' // not used.
+    })[intend.type] || '') + before
+}
+
+const renderers: UnitRenderer[] = [
+    applyInlineType,
+    applyBlockType
+]
+
 export const convertToMarkdown = (content: Unit[][]) => {
     return content.map(row =>
         row?.map(intend => {
-            const decorated = (intend.properties ? (Object.keys(intend.properties).map(key => ({
-                i: '_',
-                b: '**'
-            })[key as | 'i' | 'b'] || '', '')) : []).reduce((acc, current) => (
-                current + acc + current
-            ),
-                intend.text
-            )
-
-            if (intend.type === BlockType.image) return `![${intend.text}](${intend?.properties?.src})`;
-            if (intend.properties?.latex) return `$LATEX$(${intend.properties.latex})`
-
-            return ({
-                text: '',
-                header: '# ',
-                sub_header: '## ',
-                sub_sub_header: '### ',
-                quote: '> ',
-                numbered_list: '1. ',
-                page: '# '
-            })[intend.type] + decorated
+            const rendered = renderers.reduce((before, current) => current(intend, before), '')
+            return rendered
         }).join('')
     ).join('\n\n')
 }
@@ -141,14 +170,14 @@ export const getTableContent = async (info: TableInfo): Promise<TableRow[]> => {
             }
         }
     }
-    if(!collectionData.recordMap.block) throw new Error("Cannot access article");
+    if (!collectionData.recordMap.block) throw new Error("Cannot access article");
     return processArticleTable(collectionData.recordMap.block)
 }
 
 export const getTableInfo = async (pageId: string): Promise<TableInfo> => {
     const pageData = await getPage(pageId)
     const tableBlock = (Object.values(pageData.recordMap.block)[0]).value
-    if(!tableBlock) throw new Error("Cannot find table")
+    if (!tableBlock) throw new Error("Cannot find table")
     const {
         collection_id: collectionId,
         view_ids: [viewId]
@@ -163,7 +192,7 @@ export const getTableInfo = async (pageId: string): Promise<TableInfo> => {
 export const getArticleWithBriefId = async (tableId: string, briefId: string) => {
     const table = await getTable(tableId)
     const page = table.find(page => page.pageId.startsWith(briefId))
-    if(page?.pageId) return {
+    if (page?.pageId) return {
         ...page,
         content: convertToMarkdown((await getPageContent(page.pageId)).content)
     }

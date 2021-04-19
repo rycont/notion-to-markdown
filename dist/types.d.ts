@@ -17,7 +17,8 @@ export declare enum BlockType {
     sub_sub_header = "sub_sub_header",
     quote = "quote",
     numbered_list = "numbered_list",
-    page = "page"
+    page = "page",
+    code = "code"
 }
 export interface NotionBlock {
     role: string;
@@ -43,3 +44,4 @@ export interface TableRow {
     title: string;
     tags: string[];
 }
+export declare type UnitRenderer = (intend: Unit, before: string) => string;

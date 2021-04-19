@@ -50,13 +50,21 @@ export const getPageContent = async (pageId: string): Promise<{
     const converted = Object.values(fetchedPage.recordMap.block).map(block => {
         if (!block.value) return null
 
+        if (block.value.type && [BlockType.page, BlockType.collection_view_page].includes(block.value.type)) return [{
+            text: block.value.properties?.title?.[0][0] || '제목 없음',
+            properties: {
+                targetPageId: block.value.id,
+                icon: block.value.format?.page_icon || null
+            },
+            type: BlockType.page
+        }] as Unit[]
+
         if (block.value.properties?.title)
             return block.value.properties.title.map(element => ({
                 text: element[0],
                 properties: element[1] && block?.value?.type && parseStyle(block?.value?.type, element[1]),
                 type: block.value?.type as BlockType
             }))
-
         if (block.value.properties?.source)
             return [{
                 text: block.value.properties?.caption?.[0][0] || '',
@@ -80,6 +88,8 @@ const applyInlineType: UnitRenderer = (intend: Unit) => {
     if (intend.properties?.latex)
         return `$${intend.properties.latex}$`
 
+    if (intend.properties.link) return `[${intend.text}](${intend.properties.link})`;
+
     const decorated = (intend.properties ? (Object.keys(intend.properties).map(key => ({
         i: '_',
         b: '**',
@@ -94,11 +104,14 @@ const applyInlineType: UnitRenderer = (intend: Unit) => {
 }
 
 const applyBlockType = (intend: Unit, before: string) => {
+    console.log(intend)
     // latex
     if (intend.properties?.latex) return `$$\n${intend.properties.latex}\n$$`
 
     if (intend.type === BlockType.text) return before
 
+    if (intend.type === BlockType.page && intend.properties?.targetPageId)
+        return `[${intend.properties.icon || ''}${intend.text}](/${intend.properties.targetPageId.split('-').join('')})`
     // image
     if (intend.type === BlockType.image) return `![${before}](${intend?.properties?.src})`;
 
@@ -112,8 +125,10 @@ const applyBlockType = (intend: Unit, before: string) => {
         sub_sub_header: '### ',
         quote: '> ',
         numbered_list: '1. ',
-        page: '# ',
-        code: '```' // not used.
+        page: 'PPPPP',
+        code: '```', // not used.,
+        callout: '> ',
+        collection_view_page: 'PPPPP'
     })[intend.type] || '') + before
 }
 
@@ -129,6 +144,12 @@ export const convertToMarkdown = (content: Unit[][]) => {
             return rendered
         }).join('')
     ).join('\n\n')
+}
+
+export const getRenderedPage = async (pageId: string) => {
+    const page = await getPageContent(pageId)
+    console.log(page.content)
+    return convertToMarkdown(page.content)
 }
 
 const processArticleTable = (blocks: {

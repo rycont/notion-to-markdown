@@ -20,7 +20,9 @@ export enum BlockType {
     quote = "quote",
     numbered_list = "numbered_list",
     page = "page",
-    code = "code"
+    code = "code",
+    callout = "callout",
+    collection_view_page = "collection_view_page"
 }
 
 export interface NotionBlock {
@@ -39,6 +41,10 @@ export interface NotionBlock {
             source?: [string[]];
             caption?: [string[]];
             "s3#F"?: string[][];
+        };
+        format?: {
+            page_icon?: string;
+            page_full_width?: boolean;
         }
     }
 }

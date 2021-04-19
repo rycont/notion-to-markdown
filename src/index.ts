@@ -1,5 +1,6 @@
-import { BlockType, NotionBlock, Unit, TableInfo, TableRow, UnitRenderer } from "./types"
+import { BlockType, NotionBlock, Unit, TableInfo, TableRow, UnitRenderer, Renderer, TypeRenderer, rendererKeys } from "./types"
 import nfetch, { Headers as nHeaders } from 'node-fetch'
+import { defaultRenderers } from "./renderers"
 
 const fetcher = global.fetch || nfetch
 const PolyHeaders = global.Headers || nHeaders
@@ -33,8 +34,11 @@ const getPage = async (pageId: string): Promise<{
 const parseStyle = (type: string, attributes: string[][]) => {
     return Object.fromEntries(attributes.map(attribute => [
         ({
-            'a': 'link',
-            'e': 'latex'
+            'a': 'outlink',
+            'e': 'inlineEquation',
+            'i': 'italic',
+            'b': 'bold',
+            'c': 'inlineCode'
         })[attribute[0] as | 'a'] || attribute[0],
         attribute[1] || true
     ]))
@@ -53,8 +57,14 @@ export const getPageContent = async (pageId: string): Promise<{
         if (block.value.type && [BlockType.page, BlockType.collection_view_page].includes(block.value.type)) return [{
             text: block.value.properties?.title?.[0][0] || '제목 없음',
             properties: {
-                targetPageId: block.value.id,
-                icon: block.value.format?.page_icon || null
+                internalLink: {
+                    targetPageId: block.value.id,
+                    icon: block.value.format?.page_icon?.length ? (block.value.format.page_icon.length < 5 ? {
+                        emoji: block.value.format.page_icon
+                    } : {
+                        src: block.value.format.page_icon
+                    }) : null
+                }
             },
             type: BlockType.page
         }] as Unit[]
@@ -70,7 +80,9 @@ export const getPageContent = async (pageId: string): Promise<{
                 text: block.value.properties?.caption?.[0][0] || '',
                 type: BlockType.image,
                 properties: {
-                    src: block.value.properties.source[0][0],
+                    inlineImage: {
+                        src: block.value.properties.source[0][0]
+                    }
                 }
             }]
 
@@ -82,74 +94,64 @@ export const getPageContent = async (pageId: string): Promise<{
     }
 }
 
-const applyInlineType: UnitRenderer = (intend: Unit) => {
-    if (!intend.properties) return intend.text
-
-    if (intend.properties?.latex)
-        return `$${intend.properties.latex}$`
-
-    if (intend.properties.link) return `[${intend.text}](${intend.properties.link})`;
-
-    const decorated = (intend.properties ? (Object.keys(intend.properties).map(key => ({
-        i: '_',
-        b: '**',
-        c: '`'
-    })[key as | 'i' | 'b'] || '', '')) : []).reduce((acc, current) => (
-        current + acc + current
-    ),
-        intend.text
-    )
-
-    return decorated
+const isSupportedRenderer = (type: string, renderer: Renderer): type is typeof rendererKeys[number] => {
+    return Object.keys(renderer).includes(type)
 }
 
-const applyBlockType = (intend: Unit, before: string) => {
-    console.log(intend)
-    // latex
-    if (intend.properties?.latex) return `$$\n${intend.properties.latex}\n$$`
+const applyInlineType: TypeRenderer = (intend: Unit, before: string, renderer: Renderer) => {
+    const decorated = intend.properties && Object.keys(intend.properties)
+        .reduce((acc, property) => {
+            if (isSupportedRenderer(property, renderer))
+                return (renderer[property])(intend, acc)
+            return ''
+        }, '')
 
-    if (intend.type === BlockType.text) return before
+    if (decorated)
+        return decorated
+    return intend.text
+}
 
-    if (intend.type === BlockType.page && intend.properties?.targetPageId)
-        return `[${intend.properties.icon || ''}${intend.text}](/${intend.properties.targetPageId.split('-').join('')})`
-    // image
-    if (intend.type === BlockType.image) return `![${before}](${intend?.properties?.src})`;
+const applyBlockType: TypeRenderer = (intend: Unit, before: string, renderer: Renderer) => {
+    if (intend.type === BlockType.text)
+        return renderer.textBlock(intend, before)
 
     // code
     if (intend.type === BlockType.code) return "```\n" + before + "\n```"
 
-    return (({
-        text: '',
-        header: '# ',
-        sub_header: '## ',
-        sub_sub_header: '### ',
-        quote: '> ',
-        numbered_list: '1. ',
-        page: 'PPPPP',
-        code: '```', // not used.,
-        callout: '> ',
-        collection_view_page: 'PPPPP'
-    })[intend.type] || '') + before
+    console.log(intend.type)
+    return renderer[intend.type](intend, before)
+    // return (({
+    //     header: '# ',
+    //     sub_header: '## ',
+    //     sub_sub_header: '### ',
+    //     quote: '> ',
+    //     numbered_list: '1. ',
+    //     page: '',
+    //     equation: '$$', // not used
+    //     callout: '> ',
+    //     collection_view_page: 'PPPPP',
+    //     image: ''
+    // })[intend.type] || '') + before
 }
 
-const renderers: UnitRenderer[] = [
+const renderPipe: TypeRenderer[] = [
     applyInlineType,
     applyBlockType
 ]
 
-export const convertToMarkdown = (content: Unit[][]) => {
+export const convertToMarkdown = (content: Unit[][], customRenderer: Renderer = defaultRenderers) => {
     return content.map(row =>
         row?.map(intend => {
-            const rendered = renderers.reduce((before, current) => current(intend, before), '')
+            const rendered = renderPipe.reduce((before, current) => current(intend, before, customRenderer), '')
             return rendered
         }).join('')
     ).join('\n\n')
 }
 
-export const getRenderedPage = async (pageId: string) => {
+export const getRenderedPage = async (pageId: string, renderer: Renderer = defaultRenderers) => {
     const page = await getPageContent(pageId)
     console.log(page.content)
-    return convertToMarkdown(page.content)
+    return convertToMarkdown(page.content, renderer)
 }
 
 const processArticleTable = (blocks: {
